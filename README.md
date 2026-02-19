@@ -1,36 +1,88 @@
 # 📊 Investment Bank Sentiment Heatmap (2026 Outlook)
 
-This project is a Python-based visualization tool that generates an interactive heatmap of global market sentiments using **Plotly**. It is designed to aggregate "House Views" from major investment banks (like BofA, Goldman Sachs, J.P. Morgan, and UBS) to identify market consensus and institutional dispersion for the year 2026.
+Extract text from investment-bank outlook PDFs, map language to allocation sentiment, and visualize cross-bank views in an interactive heatmap.
 
+## Step-by-step implementation
 
-## Introduction 💡
+### Step 1: Extract text from PDFs
+The pipeline uses:
+- **Primary**: `PyMuPDF` (`fitz`) for robust extraction from complex reports.
+- **Fallback**: `pypdf` if PyMuPDF is unavailable.
 
-This project simplifies that process by translating qualitative analyst views—such as "Cautiously Optimistic" or "Relatively Bearish"—into a quantitative 5-point scale. It provides a quick overview of institutional positioning across key markets like the S&P 500, China, and Japan.
-By using Plotly, this script converts complex analyst reports into an interactive dashboard where users can identify:
-- Market Consensus: Which regions have unanimous "Bullish" or "Bearish" views.
-- Institutional Dispersion: Where banks have conflicting outlooks (e.g., China Market).
+### Step 2: Extract sentiment labels
+Supported sentiment labels:
+- `Overweight`
+- `Slight Over`
+- `Neutral`
+- `Slight Under`
+- `Underweight`
 
-## Installation ⚙️
+Two classification modes:
+- `keyword` (default): regex over finance terms like overweight/bullish/neutral/underweight.
+- `finbert`: uses `ProsusAI/finbert` from Hugging Face and maps positive/neutral/negative into overweight/neutral/underweight.
 
-The required packages to run this code can be found in the `requirements.txt` file. If you are using **GitHub Codespaces**, run the following command in your terminal:
+### Step 3: Build matrix
+The script builds a **bank × asset** matrix and maps labels to scores:
+- `Underweight = -2`
+- `Slight Under = -1`
+- `Neutral = 0`
+- `Slight Over = 1`
+- `Overweight = 2`
+
+### Step 4: Build interactive heatmap
+`plotly.express.imshow()` renders the matrix as an interactive heatmap.
+Hover on any cell to inspect:
+- bank name
+- asset class
+- normalized sentiment label
+- original evidence sentence
+
+---
+
+## Installation
 
 ```bash
-pip install plotly pandas
+pip install -r requirements.txt
 ```
 
-## Usage ⌨️
-To generate the interactive heatmap and view it in your browser, execute the script:
+> If you plan to use `--method finbert`, also install:
+
 ```bash
-python heatmap.py
+pip install transformers torch
 ```
 
-## Sentiment Scale Reference 📊
-The heatmap uses a standardized color-coded scale to represent institutional positioning based on the original research:
+## Usage
 
-| Score        | Label                          | Color   |
-|----------------|--------------------------------------|----------|
-| **2**      | Overweight / Bullish     | 🟧 Dark Orange  |
-| **1**     | Slight Overweight                  | 🔸 Light Orange |
-| **0**  | Neutral / Benchmark | ⬜ Light Grey |
-| **-1**  | Slight Underweight | 🔹 Light Green |
-| **-2**  | Underweight / Bearish | 🟩 Dark Green |
+1) Put PDF files in `pdfs/` (or any folder):
+
+```text
+pdfs/
+  Goldman_Sachs.pdf
+  JPMorgan.pdf
+  Morgan_Stanley.pdf
+```
+
+2) Run keyword-based extraction (default):
+
+```bash
+python heatmap_pipeline.py \
+  --pdf-dir pdfs \
+  --assets "US Equities" "Emerging Markets" "Fixed Income" "Commodities" \
+  --output-html sentiment_heatmap.html \
+  --output-csv sentiment_extraction.csv
+```
+
+3) Run FinBERT-based extraction:
+
+```bash
+python heatmap_pipeline.py \
+  --pdf-dir pdfs \
+  --assets "US Equities" "Emerging Markets" "Fixed Income" "Commodities" \
+  --method finbert \
+  --output-html sentiment_heatmap.html \
+  --output-csv sentiment_extraction.csv
+```
+
+## Outputs
+- `sentiment_heatmap.html`: interactive heatmap
+- `sentiment_extraction.csv`: extracted rows with label, evidence, and method
