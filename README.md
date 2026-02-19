@@ -1,65 +1,59 @@
 # 📊 Investment Bank Sentiment Heatmap (2026 Outlook)
 
-This project extracts outlook language from investment-bank PDF reports, maps views into a 5-level allocation scale, and renders an interactive Plotly heatmap.
+Extract text from investment-bank outlook PDFs, map language to allocation sentiment, and visualize cross-bank views in an interactive heatmap.
 
-## End-to-end workflow
+## Step-by-step implementation
 
-### 1) Extract text from PDFs
-Use `PyMuPDF` (`fitz`) as the primary parser and `pypdf` as fallback.
+### Step 1: Extract text from PDFs
+The pipeline uses:
+- **Primary**: `PyMuPDF` (`fitz`) for robust extraction from complex reports.
+- **Fallback**: `pypdf` if PyMuPDF is unavailable.
 
-```python
-import fitz
-
-def extract_text(pdf_path):
-    doc = fitz.open(pdf_path)
-    text = ""
-    for page in doc:
-        text += page.get_text("text")
-    return text
-```
-
-In this repo, that logic is implemented in `extract_text()` inside `heatmap_pipeline.py`.
-
-### 2) Convert language to sentiment labels
-The script uses a practical, finance-focused keyword classifier to map outlook phrases into:
-
+### Step 2: Extract sentiment labels
+Supported sentiment labels:
 - `Overweight`
 - `Slight Over`
 - `Neutral`
 - `Slight Under`
 - `Underweight`
 
-Examples:
+Two classification modes:
+- `keyword` (default): regex over finance terms like overweight/bullish/neutral/underweight.
+- `finbert`: uses `ProsusAI/finbert` from Hugging Face and maps positive/neutral/negative into overweight/neutral/underweight.
 
-- “overweight”, “bullish” → `Overweight`
-- “slightly underweight”, “cautious” → `Slight Under`
-- “benchmark”, “market weight” → `Neutral`
-
-> Optional extension: replace classifier with FinBERT for more context-aware classification.
-
-### 3) Build the matrix
-The extraction output is transformed into a bank × asset matrix and mapped to numeric scores:
-
+### Step 3: Build matrix
+The script builds a **bank × asset** matrix and maps labels to scores:
 - `Underweight = -2`
 - `Slight Under = -1`
 - `Neutral = 0`
 - `Slight Over = 1`
 - `Overweight = 2`
 
-### 4) Visualize interactively
-`plotly.express.imshow()` creates an interactive heatmap. Hover tooltips show the bank, asset, normalized label, and source evidence sentence.
+### Step 4: Build interactive heatmap
+`plotly.express.imshow()` renders the matrix as an interactive heatmap.
+Hover on any cell to inspect:
+- bank name
+- asset class
+- normalized sentiment label
+- original evidence sentence
 
 ---
 
-## Installation ⚙️
+## Installation
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage ⌨️
+> If you plan to use `--method finbert`, also install:
 
-1. Put bank outlook PDFs into a folder (default: `pdfs/`), e.g.:
+```bash
+pip install transformers torch
+```
+
+## Usage
+
+1) Put PDF files in `pdfs/` (or any folder):
 
 ```text
 pdfs/
@@ -68,7 +62,7 @@ pdfs/
   Morgan_Stanley.pdf
 ```
 
-2. Run pipeline:
+2) Run keyword-based extraction (default):
 
 ```bash
 python heatmap_pipeline.py \
@@ -78,17 +72,17 @@ python heatmap_pipeline.py \
   --output-csv sentiment_extraction.csv
 ```
 
-3. Open `sentiment_heatmap.html` in your browser.
+3) Run FinBERT-based extraction:
 
-## Output artifacts
+```bash
+python heatmap_pipeline.py \
+  --pdf-dir pdfs \
+  --assets "US Equities" "Emerging Markets" "Fixed Income" "Commodities" \
+  --method finbert \
+  --output-html sentiment_heatmap.html \
+  --output-csv sentiment_extraction.csv
+```
 
-- `sentiment_extraction.csv`: extracted label + evidence rows by bank/asset
-- `sentiment_heatmap.html`: interactive matrix/heatmap
-
-## Project checklist ✅
-
-- Collect PDF outlooks from target banks.
-- Pre-process and extract text.
-- Focus on allocation-related sections/sentences.
-- Map to 5-point sentiment labels.
-- Build consensus heatmap for cross-bank comparison.
+## Outputs
+- `sentiment_heatmap.html`: interactive heatmap
+- `sentiment_extraction.csv`: extracted rows with label, evidence, and method
