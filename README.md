@@ -1,36 +1,94 @@
 # 📊 Investment Bank Sentiment Heatmap (2026 Outlook)
 
-This project is a Python-based visualization tool that generates an interactive heatmap of global market sentiments using **Plotly**. It is designed to aggregate "House Views" from major investment banks (like BofA, Goldman Sachs, J.P. Morgan, and UBS) to identify market consensus and institutional dispersion for the year 2026.
+This project extracts outlook language from investment-bank PDF reports, maps views into a 5-level allocation scale, and renders an interactive Plotly heatmap.
 
+## End-to-end workflow
 
-## Introduction 💡
+### 1) Extract text from PDFs
+Use `PyMuPDF` (`fitz`) as the primary parser and `pypdf` as fallback.
 
-This project simplifies that process by translating qualitative analyst views—such as "Cautiously Optimistic" or "Relatively Bearish"—into a quantitative 5-point scale. It provides a quick overview of institutional positioning across key markets like the S&P 500, China, and Japan.
-By using Plotly, this script converts complex analyst reports into an interactive dashboard where users can identify:
-- Market Consensus: Which regions have unanimous "Bullish" or "Bearish" views.
-- Institutional Dispersion: Where banks have conflicting outlooks (e.g., China Market).
+```python
+import fitz
+
+def extract_text(pdf_path):
+    doc = fitz.open(pdf_path)
+    text = ""
+    for page in doc:
+        text += page.get_text("text")
+    return text
+```
+
+In this repo, that logic is implemented in `extract_text()` inside `heatmap_pipeline.py`.
+
+### 2) Convert language to sentiment labels
+The script uses a practical, finance-focused keyword classifier to map outlook phrases into:
+
+- `Overweight`
+- `Slight Over`
+- `Neutral`
+- `Slight Under`
+- `Underweight`
+
+Examples:
+
+- “overweight”, “bullish” → `Overweight`
+- “slightly underweight”, “cautious” → `Slight Under`
+- “benchmark”, “market weight” → `Neutral`
+
+> Optional extension: replace classifier with FinBERT for more context-aware classification.
+
+### 3) Build the matrix
+The extraction output is transformed into a bank × asset matrix and mapped to numeric scores:
+
+- `Underweight = -2`
+- `Slight Under = -1`
+- `Neutral = 0`
+- `Slight Over = 1`
+- `Overweight = 2`
+
+### 4) Visualize interactively
+`plotly.express.imshow()` creates an interactive heatmap. Hover tooltips show the bank, asset, normalized label, and source evidence sentence.
+
+---
 
 ## Installation ⚙️
 
-The required packages to run this code can be found in the `requirements.txt` file. If you are using **GitHub Codespaces**, run the following command in your terminal:
-
 ```bash
-pip install plotly pandas
+pip install -r requirements.txt
 ```
 
 ## Usage ⌨️
-To generate the interactive heatmap and view it in your browser, execute the script:
-```bash
-python heatmap.py
+
+1. Put bank outlook PDFs into a folder (default: `pdfs/`), e.g.:
+
+```text
+pdfs/
+  Goldman_Sachs.pdf
+  JPMorgan.pdf
+  Morgan_Stanley.pdf
 ```
 
-## Sentiment Scale Reference 📊
-The heatmap uses a standardized color-coded scale to represent institutional positioning based on the original research:
+2. Run pipeline:
 
-| Score        | Label                          | Color   |
-|----------------|--------------------------------------|----------|
-| **2**      | Overweight / Bullish     | 🟧 Dark Orange  |
-| **1**     | Slight Overweight                  | 🔸 Light Orange |
-| **0**  | Neutral / Benchmark | ⬜ Light Grey |
-| **-1**  | Slight Underweight | 🔹 Light Green |
-| **-2**  | Underweight / Bearish | 🟩 Dark Green |
+```bash
+python heatmap_pipeline.py \
+  --pdf-dir pdfs \
+  --assets "US Equities" "Emerging Markets" "Fixed Income" "Commodities" \
+  --output-html sentiment_heatmap.html \
+  --output-csv sentiment_extraction.csv
+```
+
+3. Open `sentiment_heatmap.html` in your browser.
+
+## Output artifacts
+
+- `sentiment_extraction.csv`: extracted label + evidence rows by bank/asset
+- `sentiment_heatmap.html`: interactive matrix/heatmap
+
+## Project checklist ✅
+
+- Collect PDF outlooks from target banks.
+- Pre-process and extract text.
+- Focus on allocation-related sections/sentences.
+- Map to 5-point sentiment labels.
+- Build consensus heatmap for cross-bank comparison.
